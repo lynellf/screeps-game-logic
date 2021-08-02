@@ -198,7 +198,7 @@ function removeDeadCreeps(creeps) {
 function getCreepCreator(spawnName) {
     const createCreep = (role) => {
         var _a, _b;
-        const newName = `${role} + ${Game.time}`;
+        const newName = `${role}_${Game.time}`;
         const bodyParts = (_a = ROLES[role]) !== null && _a !== void 0 ? _a : [];
         console.log(`Spawning new ${role}: ${newName}`);
         (_b = Game.spawns[spawnName]) === null || _b === void 0 ? void 0 : _b.spawnCreep(bodyParts, newName, {
