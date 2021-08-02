@@ -144,9 +144,9 @@ function getAutoSpawner(creeps, spawnName) {
     return autoSpawnCreeps;
 }
 function printSpawnerStatus(spawnName, creeps) {
-    var _a;
-    if (Game.spawns[spawnName].spawning) {
-        const creepName = (_a = Game.spawns[spawnName].spawning) === null || _a === void 0 ? void 0 : _a.name;
+    var _a, _b, _c;
+    if ((_b = (_a = Game.spawns) === null || _a === void 0 ? void 0 : _a[spawnName]) === null || _b === void 0 ? void 0 : _b.spawning) {
+        const creepName = (_c = Game.spawns[spawnName].spawning) === null || _c === void 0 ? void 0 : _c.name;
         if (creepName) {
             const spawningCreep = creeps[creepName];
             Game.spawns[spawnName].room.visual.text('🛠️' + spawningCreep.memory.role, Game.spawns[spawnName].pos.x + 1, Game.spawns[spawnName].pos.y, { align: 'left', opacity: 0.8 });
