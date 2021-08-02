@@ -66,7 +66,7 @@ function getAutoSpawner(creeps: TCreeps, spawnName: string) {
 }
 
 function printSpawnerStatus(spawnName: string, creeps: TCreeps) {
-  if (Game.spawns[spawnName].spawning) {
+  if (Game.spawns?.[spawnName]?.spawning) {
     const creepName = Game.spawns[spawnName].spawning?.name
     if (creepName) {
       const spawningCreep = creeps[creepName]
