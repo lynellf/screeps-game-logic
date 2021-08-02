@@ -5,12 +5,9 @@ import {
   ROLE_BUILDER,
   ROLE_HARVESTER,
   ROLE_UPGRADER,
-  STATE_IDLE
+  STATE_IDLE,
+  SPAWN_NAME
 } from '@utils/constants'
-
-const settings = {
-  spawnName: 'HomeBase'
-}
 
 type TTasks = Record<string, (creep: TCreep) => void>
 const defaultTask = (creep: TCreep) =>
@@ -81,9 +78,8 @@ function printSpawnerStatus(spawnName: string, creeps: TCreeps) {
 }
 
 export function loop() {
-  const { spawnName } = settings
   const creeps = Game.creeps as TCreeps
-  const autoSpawnCreeps = getAutoSpawner(creeps, spawnName)
+  const autoSpawnCreeps = getAutoSpawner(creeps, SPAWN_NAME)
 
   // perform tasks based on role
   performDuties(creeps)
@@ -97,5 +93,5 @@ export function loop() {
   autoSpawnCreeps(ROLE_UPGRADER, 1)
 
   // print status when creeps are spawning?
-  printSpawnerStatus(spawnName, creeps)
+  printSpawnerStatus(SPAWN_NAME, creeps)
 }

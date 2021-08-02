@@ -17,3 +17,4 @@ export const ROLES: Record<string, BodyPartConstant[]> = {
 
 // Game Rules
 export const MAX_CONTROLLER_LEVEL = 8
+export const SPAWN_NAME = 'Homebase'
