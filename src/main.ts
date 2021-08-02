@@ -56,7 +56,7 @@ function getAutoSpawner(creeps: TCreeps, spawnName: string) {
   const createCreep = getCreepCreator(spawnName)
   const autoSpawnCreeps = (role: string, min = 2) => {
     const totalCreeps = Object.entries(creeps).filter(
-      ([_name, creep]) => creep.memory.role == role
+      ([_name, creep]) => creep.memory.role === role
     ).length
     if (totalCreeps < min) {
       createCreep(role)
