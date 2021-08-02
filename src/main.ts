@@ -1,49 +1,71 @@
-import { TCreep } from '@utils/typedefs'
+import { TCreeps, TCreep } from '@utils/typedefs'
 import { Harvester, Builder, Upgrader } from '@roles/index'
 
-const ctx = {
+const HARVESTER = 'harvester'
+const BUILDER = 'builder'
+const UPGRADER = 'upgrader'
+
+const ROLES: Record<string, BodyPartConstant[]> = {
+  [HARVESTER]: [WORK, CARRY, MOVE],
+  [BUILDER]: [WORK, CARRY, MOVE],
+  [UPGRADER]: [WORK, CARRY, MOVE]
+}
+
+const settings = {
   spawnName: 'HomeBase'
 }
-export default function main() {
-  const { spawnName } = ctx
-  const creeps = Game.creeps as Record<string, TCreep>
 
-  // perform tasks
-  for (const name in creeps) {
-    const creep = creeps[name]
-    if (creep.memory.role == 'harvester') {
-      Harvester.run(creep)
-    }
-    if (creep.memory.role == 'upgrader') {
-      Upgrader.run(creep)
-    }
-    if (creep.memory.role == 'builder') {
-      Builder.run(creep)
-    }
-  }
+type TTasks = Record<string, (creep: TCreep) => void>
+const defaultTask = (creep: TCreep) =>
+  console.warn(`No task for role ${creep.memory?.role}`)
 
-  // removing dead creeps from memory
-  for (const name in creeps) {
-    if (!creeps[name]) {
+function performDuties(creeps: TCreeps) {
+  const creepList = Object.entries(creeps)
+  creepList.forEach(([_name, creep]) => {
+    const tasks: TTasks = {
+      [HARVESTER]: Harvester.run,
+      [BUILDER]: Builder.run,
+      [UPGRADER]: Upgrader.run
+    }
+    const task = tasks?.[creep.memory.role as string] ?? defaultTask
+    task(creep)
+  })
+}
+
+function removeDeadCreeps(creeps: TCreeps) {
+  const creepNames = Object.keys(creeps)
+  creepNames.forEach((name) => {
+    const isAlive = creeps[name] !== undefined && creeps[name] !== null
+    if (!isAlive) {
       delete Memory.creeps[name]
-      console.log('Clearing non-existing creep memory:', name)
+    }
+  })
+}
+
+function getCreepCreator(spawnName: string) {
+  const createCreep = (role: string) => {
+    const newName = `${role} + Game.time`
+    const bodyParts = ROLES[role] ?? []
+    console.log('Spawning new harvester: ' + newName)
+    Game.spawns[spawnName]?.spawnCreep(bodyParts, newName, { memory: { role } })
+  }
+  return createCreep
+}
+
+function getAutoSpawner(creeps: TCreeps, spawnName: string) {
+  const createCreep = getCreepCreator(spawnName)
+  const autoSpawnCreeps = (role: string, min = 2) => {
+    const totalCreeps = Object.entries(creeps).filter(
+      ([_name, creep]) => creep.memory.role == role
+    ).length
+    if (totalCreeps < min) {
+      createCreep(role)
     }
   }
+  return autoSpawnCreeps
+}
 
-  // spawn new harvesters if needed
-  const harvesters = Object.entries(creeps).filter(
-    ([_name, creep]) => creep.memory.role == 'harvester'
-  )
-  console.log('Harvesters: ' + harvesters.length)
-
-  if (harvesters.length < 2) {
-    const newName = 'Harvester' + Game.time
-    console.log('Spawning new harvester: ' + newName)
-    Game.spawns[spawnName].spawnCreep([WORK, CARRY, MOVE], newName, {
-      memory: { role: 'harvester' }
-    })
-  }
-
+function printSpawnerStatus(spawnName: string, creeps: TCreeps) {
   if (Game.spawns[spawnName].spawning) {
     const creepName = Game.spawns[spawnName].spawning?.name
     if (creepName) {
@@ -56,4 +78,24 @@ export default function main() {
       )
     }
   }
+}
+
+export function loop() {
+  const { spawnName } = settings
+  const creeps = Game.creeps as TCreeps
+  const autoSpawnCreeps = getAutoSpawner(creeps, spawnName)
+
+  // perform tasks based on role
+  performDuties(creeps)
+
+  // removing dead creeps from memory
+  removeDeadCreeps(creeps)
+
+  // spawn new harvesters if needed
+  autoSpawnCreeps(HARVESTER, 2)
+  autoSpawnCreeps(BUILDER, 1)
+  autoSpawnCreeps(UPGRADER, 1)
+
+  // print status when creeps are spawning?
+  printSpawnerStatus(spawnName, creeps)
 }
