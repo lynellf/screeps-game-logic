@@ -43,7 +43,7 @@ function getCreepCreator(spawnName: string) {
   const createCreep = (role: string) => {
     const newName = `${role} + ${Game.time}`
     const bodyParts = ROLES[role] ?? []
-    console.log(`Spawning new ${role}: ` + newName)
+    console.log(`Spawning new ${role}: ${newName}`)
     Game.spawns[spawnName]?.spawnCreep(bodyParts, newName, {
       memory: { role, state: STATE_IDLE }
     })
