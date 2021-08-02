@@ -74,6 +74,7 @@ const ROLES = {
 };
 // Game Rules
 const MAX_CONTROLLER_LEVEL = 8;
+const SPAWN_NAME = 'Homebase';
 
 function getStateUpdater(creep) {
     const updateState = (value) => () => {
@@ -169,9 +170,6 @@ const roleUpgrader = {
     }
 };
 
-const settings = {
-    spawnName: 'HomeBase'
-};
 const defaultTask = (creep) => { var _a; return console.warn(`No task for role ${(_a = creep.memory) === null || _a === void 0 ? void 0 : _a.role}`); };
 function performDuties(creeps) {
     const creepList = Object.entries(creeps);
@@ -229,9 +227,8 @@ function printSpawnerStatus(spawnName, creeps) {
     }
 }
 function loop() {
-    const { spawnName } = settings;
     const creeps = Game.creeps;
-    const autoSpawnCreeps = getAutoSpawner(creeps, spawnName);
+    const autoSpawnCreeps = getAutoSpawner(creeps, SPAWN_NAME);
     // perform tasks based on role
     performDuties(creeps);
     // removing dead creeps from memory
@@ -241,7 +238,7 @@ function loop() {
     autoSpawnCreeps(ROLE_BUILDER, 1);
     autoSpawnCreeps(ROLE_UPGRADER, 1);
     // print status when creeps are spawning?
-    printSpawnerStatus(spawnName, creeps);
+    printSpawnerStatus(SPAWN_NAME, creeps);
 }
 
 exports.loop = loop;
