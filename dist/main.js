@@ -85,6 +85,7 @@ const ctx = {
     spawnName: 'HomeBase'
 };
 function main() {
+    var _a;
     const { spawnName } = ctx;
     const creeps = Game.creeps;
     // perform tasks
@@ -118,7 +119,7 @@ function main() {
         });
     }
     if (Game.spawns[spawnName].spawning) {
-        const creepName = Game.spawns[spawnName].spawning?.name;
+        const creepName = (_a = Game.spawns[spawnName].spawning) === null || _a === void 0 ? void 0 : _a.name;
         if (creepName) {
             const spawningCreep = creeps[creepName];
             Game.spawns[spawnName].room.visual.text('🛠️' + spawningCreep.memory.role, Game.spawns[spawnName].pos.x + 1, Game.spawns[spawnName].pos.y, { align: 'left', opacity: 0.8 });
