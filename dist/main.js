@@ -59,44 +59,116 @@ const roleHarvester = {
     }
 };
 
+// States
+const STATE_IDLE = 'idle';
+const STATE_UPGRADING = 'upgrading';
+const STATE_MOVING = 'moving';
+// Role Types
+const ROLE_HARVESTER = 'harvester';
+const ROLE_BUILDER = 'builder';
+const ROLE_UPGRADER = 'upgrader';
+const ROLES = {
+    [ROLE_HARVESTER]: [WORK, CARRY, MOVE],
+    [ROLE_BUILDER]: [WORK, CARRY, MOVE],
+    [ROLE_UPGRADER]: [WORK, CARRY, MOVE]
+};
+// Game Rules
+const MAX_CONTROLLER_LEVEL = 8;
+
+function getStateUpdater(creep) {
+    const updateState = (value) => () => {
+        creep.memory.state = value;
+    };
+    return updateState;
+}
+function getEventDispatch(creep) {
+    const updateState = getStateUpdater(creep);
+    const dispatchEvent = (event) => {
+        const possibleStates = {
+            'events/becomeIdle': {
+                [STATE_IDLE]: updateState('idle'),
+                [STATE_UPGRADING]: updateState('upgrading'),
+                [STATE_MOVING]: updateState('moving')
+            },
+            'events/startUpgrading': {
+                [STATE_IDLE]: updateState('idle'),
+                [STATE_UPGRADING]: updateState('upgrading'),
+                [STATE_MOVING]: updateState('moving')
+            },
+            'events/moveToController': {
+                [STATE_IDLE]: updateState('idle'),
+                [STATE_UPGRADING]: updateState('upgrading'),
+                [STATE_MOVING]: updateState('moving')
+            }
+        };
+        const callbackFn = possibleStates[event][creep.memory.state];
+        callbackFn();
+    };
+    return dispatchEvent;
+}
+function getActionCaller(creep, dispatch) {
+    const callActions = (actions) => {
+        actions.forEach((action) => action(creep, dispatch));
+    };
+    return callActions;
+}
+function startUpgrade(creep, dispatch) {
+    const controller = creep.room.controller;
+    const controllerLevel = controller.level;
+    const isMaxLevel = controllerLevel === MAX_CONTROLLER_LEVEL;
+    if (!isMaxLevel) {
+        creep.memory.currentControllerLevel = controllerLevel;
+        dispatch('events/startUpgrading');
+    }
+}
+function upgradeController(creep, dispatch) {
+    const controller = creep.room.controller;
+    const isInRange = creep.pos.inRangeTo(controller, 3);
+    if (isInRange) {
+        creep.upgradeController(controller);
+        return console.log(`${creep.name} upgrading controller 🛠`);
+    }
+    return dispatch('events/moveToController');
+}
+function moveToController(creep, dispatch) {
+    const controller = creep.room.controller;
+    const isInRange = creep.pos.inRangeTo(controller, 3);
+    const hasEnergy = creep.store[RESOURCE_ENERGY] > 0;
+    if (!hasEnergy) {
+        console.log(`${creep.name} needs energy ⛔ ⚡`);
+        return dispatch('events/becomeIdle');
+    }
+    if (isInRange) {
+        return dispatch('events/startUpgrading');
+    }
+    console.log(`${creep.name} moving to controller 💨`);
+    creep.moveTo(controller, { visualizePathStyle: { stroke: '#ff0000' } });
+}
+function becomeIdle(creep, dispatch) {
+    var _a;
+    const controller = creep.room.controller;
+    const controllerLevel = controller.level;
+    const prevControllerLevel = ((_a = creep.memory.currentControllerLevel) !== null && _a !== void 0 ? _a : -1);
+    const isDone = controllerLevel > prevControllerLevel;
+    if (isDone) {
+        console.log(`${creep.name} is idling 💤`);
+        return dispatch('events/becomeIdle');
+    }
+}
 const roleUpgrader = {
     run: function (creep) {
-        if (creep.memory.upgrading && creep.store[RESOURCE_ENERGY] == 0) {
-            creep.memory.upgrading = false;
-            creep.say('🔄 harvest');
-        }
-        if (!creep.memory.upgrading && creep.store.getFreeCapacity() == 0) {
-            creep.memory.upgrading = true;
-            creep.say('⚡ upgrade');
-        }
-        if (creep.memory.upgrading) {
-            if (creep.room.controller) {
-                const res = creep.upgradeController(creep.room.controller);
-                const isInRange = res !== ERR_NOT_IN_RANGE;
-                if (isInRange) {
-                    creep.moveTo(creep.room.controller, {
-                        visualizePathStyle: { stroke: '#ffffff' }
-                    });
-                }
-            }
-        }
-        else {
-            var sources = creep.room.find(FIND_SOURCES);
-            if (creep.harvest(sources[0]) == ERR_NOT_IN_RANGE) {
-                creep.moveTo(sources[0], { visualizePathStyle: { stroke: '#ffaa00' } });
-            }
-        }
+        const dispatch = getEventDispatch(creep);
+        const callActions = getActionCaller(creep, dispatch);
+        const actionList = {
+            [STATE_IDLE]: [startUpgrade],
+            [STATE_UPGRADING]: [upgradeController, becomeIdle],
+            [STATE_MOVING]: [moveToController]
+        };
+        const actions = actionList[creep.memory.state];
+        callActions(actions);
     }
 };
 
-const HARVESTER = 'harvester';
-const BUILDER = 'builder';
-const UPGRADER = 'upgrader';
-const ROLES = {
-    [HARVESTER]: [WORK, CARRY, MOVE],
-    [BUILDER]: [WORK, CARRY, MOVE],
-    [UPGRADER]: [WORK, CARRY, MOVE]
-};
 const settings = {
     spawnName: 'HomeBase'
 };
@@ -106,9 +178,9 @@ function performDuties(creeps) {
     creepList.forEach(([_name, creep]) => {
         var _a;
         const tasks = {
-            [HARVESTER]: roleHarvester.run,
-            [BUILDER]: roleBuilder.run,
-            [UPGRADER]: roleUpgrader.run
+            [ROLE_HARVESTER]: roleHarvester.run,
+            [ROLE_BUILDER]: roleBuilder.run,
+            [ROLE_UPGRADER]: roleUpgrader.run
         };
         const task = (_a = tasks === null || tasks === void 0 ? void 0 : tasks[creep.memory.role]) !== null && _a !== void 0 ? _a : defaultTask;
         task(creep);
@@ -129,7 +201,9 @@ function getCreepCreator(spawnName) {
         const newName = `${role} + ${Game.time}`;
         const bodyParts = (_a = ROLES[role]) !== null && _a !== void 0 ? _a : [];
         console.log(`Spawning new ${role}: ` + newName);
-        (_b = Game.spawns[spawnName]) === null || _b === void 0 ? void 0 : _b.spawnCreep(bodyParts, newName, { memory: { role } });
+        (_b = Game.spawns[spawnName]) === null || _b === void 0 ? void 0 : _b.spawnCreep(bodyParts, newName, {
+            memory: { role, state: STATE_IDLE }
+        });
     };
     return createCreep;
 }
@@ -162,9 +236,9 @@ function loop() {
     // removing dead creeps from memory
     removeDeadCreeps(creeps);
     // spawn new harvesters if needed
-    autoSpawnCreeps(HARVESTER, 2);
-    autoSpawnCreeps(BUILDER, 1);
-    autoSpawnCreeps(UPGRADER, 1);
+    autoSpawnCreeps(ROLE_HARVESTER, 2);
+    autoSpawnCreeps(ROLE_BUILDER, 1);
+    autoSpawnCreeps(ROLE_UPGRADER, 1);
     // print status when creeps are spawning?
     printSpawnerStatus(spawnName, creeps);
 }
