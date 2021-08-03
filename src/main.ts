@@ -1,97 +1,112 @@
-import { TCreeps, TCreep } from '@utils/typedefs'
-import { Harvester, Builder, Upgrader } from '@roles/index'
+import { TCreeps, TCreep } from "@utils/typedefs";
+import { Harvester, Builder, Upgrader } from "@roles/index";
 import {
   ROLES,
   ROLE_BUILDER,
   ROLE_HARVESTER,
   ROLE_UPGRADER,
   STATE_IDLE,
-  SPAWN_NAME
-} from '@utils/constants'
+  SPAWN_NAME,
+} from "@utils/constants";
+import { from } from "rxjs";
 
-type TTasks = Record<string, (creep: TCreep) => void>
+type TTasks = Record<string, (creep: TCreep) => void>;
 const defaultTask = (creep: TCreep) =>
-  console.warn(`No task for role ${creep.memory?.role}`)
+  console.warn(`No task for role ${creep.memory?.role}`);
 
 function performDuties(creeps: TCreeps) {
-  const creepList = Object.entries(creeps)
+  const creepList = Object.entries(creeps);
   creepList.forEach(([_name, creep]) => {
     const tasks: TTasks = {
       [ROLE_HARVESTER]: Harvester.run,
       [ROLE_BUILDER]: Builder.run,
-      [ROLE_UPGRADER]: Upgrader.run
-    }
-    const task = tasks?.[creep.memory.role as string] ?? defaultTask
-    task(creep)
-  })
+      [ROLE_UPGRADER]: Upgrader.run,
+    };
+    const task = tasks?.[creep.memory.role as string] ?? defaultTask;
+    task(creep);
+  });
 }
 
 function removeDeadCreeps(creeps: TCreeps) {
-  const creepNames = Object.keys(creeps)
+  const creepNames = Object.keys(creeps);
   creepNames.forEach((name) => {
-    const isAlive = creeps[name] !== undefined && creeps[name] !== null
+    const isAlive = creeps[name] !== undefined && creeps[name] !== null;
     if (!isAlive) {
-      delete Memory.creeps[name]
+      delete Memory.creeps[name];
     }
-  })
+  });
 }
 
 function getCreepCreator(spawnName: string) {
   const createCreep = (role: string) => {
-    const newName = `${role}_${Game.time}`
-    const bodyParts = ROLES[role] ?? []
-    console.log(`Spawning new ${role}: ${newName}`)
+    const newName = `${role}_${Game.time}`;
+    const bodyParts = ROLES[role] ?? [];
+    console.log(`Spawning new ${role}: ${newName}`);
     const returnCode = Game.spawns[spawnName].spawnCreep(bodyParts, newName, {
-      memory: { role, state: STATE_IDLE }
-    })
-    console.log(`return code: ${returnCode}`)
-  }
-  return createCreep
+      memory: { role, state: STATE_IDLE },
+    });
+    console.log(`return code: ${returnCode}`);
+  };
+  return createCreep;
 }
 
 function getAutoSpawner(creeps: TCreeps, spawnName: string) {
-  const createCreep = getCreepCreator(spawnName)
+  const createCreep = getCreepCreator(spawnName);
   const autoSpawnCreeps = (role: string, min = 2) => {
     const totalCreeps = Object.entries(creeps).filter(
       ([_name, creep]) => creep.memory.role === role
-    ).length
+    ).length;
     if (totalCreeps < min) {
-      createCreep(role)
+      createCreep(role);
     }
-  }
-  return autoSpawnCreeps
+  };
+  return autoSpawnCreeps;
 }
 
 function printSpawnerStatus(spawnName: string, creeps: TCreeps) {
   if (Game.spawns?.[spawnName]?.spawning) {
-    const creepName = Game.spawns[spawnName].spawning?.name
+    const creepName = Game.spawns[spawnName].spawning?.name;
     if (creepName) {
-      const spawningCreep = creeps[creepName]
+      const spawningCreep = creeps[creepName];
       Game.spawns[spawnName].room.visual.text(
-        '🛠️' + spawningCreep.memory.role,
+        "🛠️" + spawningCreep.memory.role,
         Game.spawns[spawnName].pos.x + 1,
         Game.spawns[spawnName].pos.y,
-        { align: 'left', opacity: 0.8 }
-      )
+        { align: "left", opacity: 0.8 }
+      );
     }
   }
 }
 
+// function getObserver<T>(item: T) {
+//   return {
+//     next: (item: T) => console.log(`Got next ${item}`),
+//     error: (err: any) => console.error(`Got error ${err}`),
+//     complete: () => console.log("Got complete"),
+//   };
+// }
+
 export function loop() {
-  const creeps = Game.creeps as TCreeps
-  const autoSpawnCreeps = getAutoSpawner(creeps, SPAWN_NAME)
+  const creeps = Game.creeps as TCreeps;
+  const autoSpawnCreeps = getAutoSpawner(creeps, SPAWN_NAME);
+  const creepsObserverable = from(Object.entries(creeps));
+
+  creepsObserverable.subscribe(([name, _creep]) =>
+    console.log(`Hello, my name is
+  ${name}`)
+  );
 
   // perform tasks based on role
-  performDuties(creeps)
+  performDuties(creeps);
 
   // removing dead creeps from memory
-  removeDeadCreeps(creeps)
+  removeDeadCreeps(creeps);
 
   // spawn new harvesters if needed
-  autoSpawnCreeps(ROLE_HARVESTER, 2)
-  autoSpawnCreeps(ROLE_BUILDER, 1)
-  autoSpawnCreeps(ROLE_UPGRADER, 1)
+  autoSpawnCreeps(ROLE_HARVESTER, 2);
+  autoSpawnCreeps(ROLE_BUILDER, 1);
+  autoSpawnCreeps(ROLE_UPGRADER, 1);
 
   // print status when creeps are spawning?
-  printSpawnerStatus(SPAWN_NAME, creeps)
+  printSpawnerStatus(SPAWN_NAME, creeps);
 }
