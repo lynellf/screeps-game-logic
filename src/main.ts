@@ -1,14 +1,13 @@
 import { TCreeps, TCreep } from "@utils/typedefs";
 import { Harvester, Builder, Upgrader } from "@roles/index";
 import {
-  ROLES,
   ROLE_BUILDER,
   ROLE_HARVESTER,
   ROLE_UPGRADER,
-  STATE_IDLE,
   SPAWN_NAME,
 } from "@utils/constants";
-import { from, scan } from "rxjs";
+import { getSpawnMachine } from '@structures/spawnMachine'
+import { interpret } from 'xstate'
 
 type TTasks = Record<string, (creep: TCreep) => void>;
 const defaultTask = (creep: TCreep) =>
@@ -37,32 +36,6 @@ function removeDeadCreeps(creeps: TCreeps) {
   });
 }
 
-function getCreepCreator(spawnName: string) {
-  const createCreep = (role: string) => {
-    const newName = `${role}_${Game.time}`;
-    const bodyParts = ROLES[role] ?? [];
-    console.log(`Spawning new ${role}: ${newName}`);
-    const returnCode = Game.spawns[spawnName].spawnCreep(bodyParts, newName, {
-      memory: { role, state: STATE_IDLE },
-    });
-    console.log(`return code: ${returnCode}`);
-  };
-  return createCreep;
-}
-
-function getAutoSpawner(creeps: TCreeps, spawnName: string) {
-  const createCreep = getCreepCreator(spawnName);
-  const autoSpawnCreeps = (role: string, min = 2) => {
-    const totalCreeps = Object.entries(creeps).filter(
-      ([_name, creep]) => creep.memory.role === role
-    ).length;
-    if (totalCreeps < min) {
-      createCreep(role);
-    }
-  };
-  return autoSpawnCreeps;
-}
-
 function printSpawnerStatus(spawnName: string, creeps: TCreeps) {
   if (Game.spawns?.[spawnName]?.spawning) {
     const creepName = Game.spawns[spawnName].spawning?.name;
@@ -78,25 +51,17 @@ function printSpawnerStatus(spawnName: string, creeps: TCreeps) {
   }
 }
 
-type TCreepArr = TCreep[];
-const INITAL_CTX = [
-  {
-    creeps: [] as TCreepArr,
-  },
-];
-
 type TMain = {
   game: Game;
   rawMemory: RawMemory;
 };
 
-export function main({ game, rawMemory }: TMain) {
+export function main({ game }: TMain) {
   const creeps = game.creeps as TCreeps;
-  const autoSpawnCreeps = getAutoSpawner(creeps, SPAWN_NAME);
-  const allCreeps = Object.values(creeps);
-  const creepsObserverable = from(allCreeps);
-
-  creepsObserverable.pipe(scan((currentCreeps, nextCreep) => currentCreeps));
+  const spawnMachine = getSpawnMachine(game);
+  
+  // start autospawner
+  interpret(spawnMachine).start()
 
   // perform tasks based on role
   performDuties(creeps);
@@ -104,10 +69,6 @@ export function main({ game, rawMemory }: TMain) {
   // removing dead creeps from memory
   removeDeadCreeps(creeps);
 
-  // spawn new harvesters if needed
-  autoSpawnCreeps(ROLE_HARVESTER, 2);
-  autoSpawnCreeps(ROLE_BUILDER, 1);
-  autoSpawnCreeps(ROLE_UPGRADER, 1);
 
   // print status when creeps are spawning?
   printSpawnerStatus(SPAWN_NAME, creeps);
