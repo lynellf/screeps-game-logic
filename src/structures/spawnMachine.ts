@@ -1,17 +1,35 @@
-import { createMachine, EventObject, send } from "xstate";
-import { SPAWN_NAME, REQUIREMENTS, COSTS } from "@utils/constants";
+import { createMachine, EventObject } from "xstate";
+import {
+  SPAWN_NAME,
+  REQUIREMENTS,
+  COSTS,
+  ROLE_HARVESTER,
+  ROLE_BUILDER,
+  ROLE_UPGRADER,
+} from "@utils/constants";
 import { getCreepCreator } from "@utils/spawning";
 import { TCreeps } from "@utils/typedefs";
 
+/**
+ * Constants
+ * */
 // states
 const SPAWNING = "spawning";
 const IDLE = "idle";
 
 // actions
-export const SPAWN_HARVESTER = "SPAWN_HARVESTER";
-export const SPAWN_BUILDER = "SPAWN_BUILDER";
-export const SPAWN_UPGRADER = "SPAWN_UPGRADER";
+export const SPAWN_HARVESTER = "spawnHarvester";
+export const SPAWN_BUILDER = "spawnBuilder";
+export const SPAWN_UPGRADER = "spawnUpgrader";
 
+// conditions
+const CHECK_FOR_HARVESTERS = "harvesterGuard";
+const CHECK_FOR_BUILDERS = "builderGuard";
+const CHECK_FOR_UPGRADERS = "upgraderGuard";
+
+/**
+ * Side Effects
+ * */
 function getStatus(spawnStructure: StructureSpawn) {
   return spawnStructure.spawning ? SPAWNING : IDLE;
 }
@@ -20,10 +38,18 @@ function getEnergy(spawnStructure: StructureSpawn) {
   return spawnStructure.store.getCapacity("energy");
 }
 
+/**
+ * Type definitions
+ * */
 type TCtx = { game: Game; energy: number };
 type TEvent = EventObject & { role: TRoles };
 type TRoles = keyof typeof REQUIREMENTS;
-function getRequirementCheck(role: TRoles) {
+type TCallback = (role: string) => void;
+
+/**
+ * Factories
+ * */
+function guardFactory(role: TRoles) {
   return (context: TCtx, _event: TEvent) => {
     const { game, energy } = context;
     const creeps = Object.values(game.creeps as TCreeps);
@@ -34,26 +60,26 @@ function getRequirementCheck(role: TRoles) {
   };
 }
 
-function getCreatorAction(role: TRoles, createCreep: (role: string) => void) {
-  return (_context: TCtx, _event: TEvent) => {
-    console.log(`creating creep with the role: ${role}...`)
-    createCreep(role);
+function actionWrapper(action: TCallback) {
+  return (role: TRoles) => (_context: TCtx, _event: TEvent) => {
+    action(role);
   };
 }
 
 export function getSpawnMachine(game: Game) {
   const spawnStructure = game.spawns[SPAWN_NAME];
   const createCreep = getCreepCreator(game);
+  const createAction = actionWrapper(createCreep);
 
   // guards
-  const checkForHarvesters = getRequirementCheck("harvester");
-  const checkForBuilders = getRequirementCheck("builder");
-  const checkForUpgraders = getRequirementCheck("upgrader");
+  const harvesterGuard = guardFactory(ROLE_HARVESTER);
+  const builderGuard = guardFactory(ROLE_BUILDER);
+  const upgraderGuard = guardFactory(ROLE_UPGRADER);
 
   // actions
-  const createHarvesterAction = getCreatorAction('harvester', createCreep);
-  const createBuilderAction = getCreatorAction('builder', createCreep);
-  const createUpgraderAction = getCreatorAction('upgrader', createCreep);
+  const spawnHarvester = createAction(ROLE_HARVESTER);
+  const spawnBuilder = createAction(ROLE_BUILDER);
+  const spawnUpgrader = createAction(ROLE_UPGRADER);
 
   return createMachine(
     {
@@ -65,78 +91,37 @@ export function getSpawnMachine(game: Game) {
       },
       states: {
         [IDLE]: {
-          on: {
-            [SPAWN_HARVESTER]: [
-              {
-                target: SPAWNING,
-                cond: "checkForHarvesters",
-                actions: ["createHarvesterAction"],
-              },
-              { target: IDLE },
-            ],
-            [SPAWN_BUILDER]: [
-              {
-                target: SPAWNING,
-                cond: "checkForBuilders",
-                actions: ["createBuilderAction"],
-              },
-              { target: IDLE },
-            ],
-            [SPAWN_UPGRADER]: [
-              {
-                target: SPAWNING,
-                cond: "checkForUpgraders",
-                actions: ["createUpgraderAction"],
-              },
-              { target: IDLE },
-            ],
-          },
           always: [
             {
               target: SPAWNING,
-              cond: "checkForHarvesters",
-              actions: ["createHarvesterAction"],
+              cond: CHECK_FOR_HARVESTERS,
+              actions: [SPAWN_HARVESTER],
             },
             {
               target: SPAWNING,
-              cond: "checkForUpgraders",
-              actions: ["createUpgraderAction"],
+              cond: CHECK_FOR_UPGRADERS,
+              actions: [SPAWN_UPGRADER],
             },
             {
               target: SPAWNING,
-              cond: "checkForBuilders",
-              actions: ["createBuilderAction"],
+              cond: CHECK_FOR_BUILDERS,
+              actions: [SPAWN_BUILDER],
             },
           ],
         },
-        [SPAWNING]: {
-          on: {
-            [SPAWN_HARVESTER]: [
-              { target: SPAWNING, cond: "checkForHarvesters" },
-              { target: IDLE },
-            ],
-            [SPAWN_BUILDER]: [
-              { target: SPAWNING, cond: "checkForBuilders" },
-              { target: IDLE },
-            ],
-            [SPAWN_UPGRADER]: [
-              { target: SPAWNING, cond: "checkForUpgraders" },
-              { target: IDLE },
-            ],
-          },
-        },
+        [SPAWNING]: {},
       },
     },
     {
       actions: {
-        createHarvesterAction,
-        createBuilderAction,
-        createUpgraderAction,
+        spawnHarvester,
+        spawnBuilder,
+        spawnUpgrader,
       },
       guards: {
-        checkForHarvesters,
-        checkForBuilders,
-        checkForUpgraders,
+        harvesterGuard,
+        builderGuard,
+        upgraderGuard,
       },
     }
   );

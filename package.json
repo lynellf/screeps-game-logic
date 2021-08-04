@@ -4,12 +4,18 @@
   "description": "",
   "main": "main.js",
   "scripts": {
-    "test": "jest --watchAll",
+    "test": "jest",
+    "test:watch": "jest --watchAll",
     "build": "rollup -c"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
+  "husky": {
+    "hooks": {
+      "pre-push": "npm run test && npm run build"
+    }
+  },
   "dependencies": {
     "@rollup/plugin-commonjs": "^20.0.0",
     "@rollup/plugin-node-resolve": "^13.0.4",
@@ -17,7 +23,9 @@
     "@types/jest": "^26.0.24",
     "@types/lodash": "^4.14.171",
     "@types/screeps": "^3.2.3",
+    "dotenv": "^10.0.0",
     "faker": "^5.5.3",
+    "husky": "^7.0.1",
     "jest": "^27.0.6",
     "rollup": "^2.55.1",
     "rollup-plugin-clear": "^2.0.7",

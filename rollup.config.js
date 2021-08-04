@@ -5,14 +5,21 @@ import resolve from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
 import typescript from 'rollup-plugin-typescript2';
 import screeps from 'rollup-plugin-screeps';
+require('dotenv').config();
 
-let cfg;
-// const dest = process.env.DEST;
-// if (!dest) {
-//   console.log("No destination specified - code will be compiled but not uploaded");
-// } else if ((cfg = require("./screeps.json")[dest]) == null) {
-//   throw new Error("Invalid upload destination");
-// }
+const cfg = require("./screeps.json");
+
+/**
+ * Apply secret from .env file
+ * */
+function appendToken() {
+  const token = process.env.TOKEN;
+  if(cfg) {
+    cfg.token = token;
+  }
+}
+
+appendToken();
 
 export default {
   input: "src/main.ts",
@@ -28,6 +35,6 @@ export default {
     resolve({ rootDir: "src" }),
     commonjs(),
     typescript({ tsconfig: "./tsconfig.json" }),
-    screeps({ config: cfg, dryRun: cfg == null })
+    screeps({ config: cfg })
   ]
 }
