@@ -1,5 +1,12 @@
 import { createMachine, EventObject } from "xstate";
-import { SPAWN_NAME, REQUIREMENTS, COSTS } from "@utils/constants";
+import {
+  SPAWN_NAME,
+  REQUIREMENTS,
+  COSTS,
+  ROLE_HARVESTER,
+  ROLE_BUILDER,
+  ROLE_UPGRADER,
+} from "@utils/constants";
 import { getCreepCreator } from "@utils/spawning";
 import { TCreeps } from "@utils/typedefs";
 
@@ -65,14 +72,14 @@ export function getSpawnMachine(game: Game) {
   const createAction = actionWrapper(createCreep);
 
   // guards
-  const harvesterGuard = guardFactory("harvester");
-  const builderGuard = guardFactory("builder");
-  const upgraderGuard = guardFactory("upgrader");
+  const harvesterGuard = guardFactory(ROLE_HARVESTER);
+  const builderGuard = guardFactory(ROLE_BUILDER);
+  const upgraderGuard = guardFactory(ROLE_UPGRADER);
 
   // actions
-  const spawnHarvester = createAction("harvester");
-  const spawnBuilder = createAction("builder");
-  const spawnUpgrader = createAction("upgrader");
+  const spawnHarvester = createAction(ROLE_HARVESTER);
+  const spawnBuilder = createAction(ROLE_BUILDER);
+  const spawnUpgrader = createAction(ROLE_UPGRADER);
 
   return createMachine(
     {
