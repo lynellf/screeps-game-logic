@@ -8,7 +8,7 @@ import {
   STATE_IDLE,
   SPAWN_NAME,
 } from "@utils/constants";
-import { from } from "rxjs";
+import { from, scan } from "rxjs";
 
 type TTasks = Record<string, (creep: TCreep) => void>;
 const defaultTask = (creep: TCreep) =>
@@ -78,23 +78,25 @@ function printSpawnerStatus(spawnName: string, creeps: TCreeps) {
   }
 }
 
-// function getObserver<T>(item: T) {
-//   return {
-//     next: (item: T) => console.log(`Got next ${item}`),
-//     error: (err: any) => console.error(`Got error ${err}`),
-//     complete: () => console.log("Got complete"),
-//   };
-// }
+type TCreepArr = TCreep[];
+const INITAL_CTX = [
+  {
+    creeps: [] as TCreepArr,
+  },
+];
 
-export function loop() {
-  const creeps = Game.creeps as TCreeps;
+type TMain = {
+  game: Game;
+  rawMemory: RawMemory;
+};
+
+export function main({ game, rawMemory }: TMain) {
+  const creeps = game.creeps as TCreeps;
   const autoSpawnCreeps = getAutoSpawner(creeps, SPAWN_NAME);
-  const creepsObserverable = from(Object.entries(creeps));
+  const allCreeps = Object.values(creeps);
+  const creepsObserverable = from(allCreeps);
 
-  creepsObserverable.subscribe(([name, _creep]) =>
-    console.log(`Hello, my name is
-  ${name}`)
-  );
+  creepsObserverable.pipe(scan((currentCreeps, nextCreep) => currentCreeps));
 
   // perform tasks based on role
   performDuties(creeps);
@@ -109,4 +111,10 @@ export function loop() {
 
   // print status when creeps are spawning?
   printSpawnerStatus(SPAWN_NAME, creeps);
+}
+
+export function loop() {
+  const game = Game;
+  const rawMemory = RawMemory;
+  main({ game, rawMemory });
 }
