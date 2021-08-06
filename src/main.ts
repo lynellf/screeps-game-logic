@@ -1,4 +1,5 @@
-import { TCreeps, TCreep } from '@utils/typedefs'
+import '@utils/shim'
+import type { TCreeps, TCreep } from '@utils/typedefs'
 import { Harvester, Builder, Upgrader, Aux } from '@creeps/index'
 import {
   ROLE_BUILDER,
