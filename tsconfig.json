@@ -5,14 +5,13 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "strict": true,
-    "moduleResolution": "node" ,
+    "moduleResolution": "node",
     "baseUrl": "./src",
     "paths": {
-      "@roles/*": ["roles/*"],
+      "@creeps/*": ["creeps/*"],
       "@utils/*": ["utils/*"],
-      "@structures/*": ["structures/*"],
-      "@managers/*": ["managers/*"]
-    },                            
+      "@structures/*": ["structures/*"]
+    },
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
