@@ -38,7 +38,8 @@ function getStatus(spawnStructure: StructureSpawn) {
 }
 
 function getEnergy(spawnStructure: StructureSpawn) {
-  return spawnStructure.store.getCapacity('energy')
+  const energy = spawnStructure.store.getUsedCapacity('energy')
+  return energy
 }
 
 /**
@@ -55,7 +56,7 @@ function guardFactory(role: TRoles) {
   return (context: TCtx, _event: TEvent) => {
     const { game, energy } = context
     const creeps = Object.values(game.creeps as TCreeps)
-    const query = getCreepsByRole(creeps, { roles: [role] })
+    const query = getCreepsByRole(creeps, role)
     const needsMore = query.length < REQUIREMENTS[role]
     const canMakeMore = energy >= COSTS[role]
     return needsMore && canMakeMore
@@ -72,12 +73,11 @@ function auxGuardFactory() {
   return (context: TCtx, _event: TEvent) => {
     const { game, energy } = context
     const creeps = Object.values(game.creeps as TCreeps)
-    const totalHarvesters = getCreepsByRole(creeps, {
-      roles: [ROLE_HARVESTER]
-    }).length
-
+    const totalHarvesters = getCreepsByRole(creeps, ROLE_HARVESTER).length
+    const totalAux = getCreepsByRole(creeps, ROLE_AUX).length
     // one aux for every two harvesters
-    const needsMore = totalHarvesters / 2 >= 1
+    const auxThreshhold = totalHarvesters / 2
+    const needsMore = totalAux < auxThreshhold
     const canMakeMore = energy >= COSTS[ROLE_AUX]
     return needsMore && canMakeMore
   }
@@ -118,19 +118,19 @@ export function getSpawnMachine(game: Game) {
             },
             {
               target: SPAWNING,
-              cond: CHECK_FOR_UPGRADERS,
-              actions: [SPAWN_UPGRADER]
-            },
-            {
-              target: SPAWNING,
-              cond: CHECK_FOR_BUILDERS,
-              actions: [SPAWN_BUILDER]
-            },
-            {
-              target: SPAWNING,
               cond: auxGuard,
               actions: [SPAWN_AUX]
+            },
+            {
+              target: SPAWNING,
+              cond: CHECK_FOR_UPGRADERS,
+              actions: [SPAWN_UPGRADER]
             }
+            // {
+            //   target: SPAWNING,
+            //   cond: CHECK_FOR_BUILDERS,
+            //   actions: [SPAWN_BUILDER]
+            // }
           ]
         },
         [SPAWNING]: {}
