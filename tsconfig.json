@@ -8,6 +8,7 @@
     "moduleResolution": "node",
     "baseUrl": "./src",
     "paths": {
+      "@managers/*": ["managers/*"],
       "@creeps/*": ["creeps/*"],
       "@utils/*": ["utils/*"],
       "@structures/*": ["structures/*"]
