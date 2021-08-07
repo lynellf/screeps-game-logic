@@ -1,121 +1,87 @@
 import { TCreep } from '@utils/typedefs'
-import { ROLE_BUILDER, ROLE_UPGRADER } from '@utils/constants'
-import { createMachine, EventObject, interpret } from 'xstate'
+import { ROLE_UPGRADER } from '@utils/constants'
+import { getInitialState, getCreepsByRole } from '@utils/creeps'
+import { createMachine, EventObject as TEvent, interpret } from 'xstate'
 
 // state
-const STATE_DELIVERING = 'delivering'
+const STATE_TRANSFERRING = 'transferring'
 const STATE_IDLE = 'idle'
-const STATE_SOURCING = 'sourcing'
+const STATE_READY = 'ready'
 
 // actions
-const ACTION_PICKUP_ENERGY = 'pickupEnergy'
-const ACTION_DROP_OFF_ENERGY = 'dropOffEnergy'
+const ACTION_TRANSFER_ENERGY = 'transferEnergy'
 
 // guards
-const GUARD_CAN_DELIVER_ENERGY = 'canDeliverEnergy'
-const GUARD_CAN_PICKUP_ENERGY = 'canPickupEnergy'
+const GUARD_CAN_TRANSFER_ENERGY = 'canTransferEnergy'
+const GUARD_IS_READY = 'canReceiveEnergy'
 
 // types
 export type TCtx = {
   self: TCreep
-  energyPos: { x: number; y: number }
-  destPos: { x: number; y: number }
-  droppedEnergy: Resource<ResourceConstant> | undefined
-}
-
-function getInitialState(creep: TCreep) {
-  const totalEnergy = creep.store.getCapacity('energy')
-  const shouldDeliver = totalEnergy > 0
-  return shouldDeliver ? STATE_DELIVERING : STATE_IDLE
+  targetCreep: TCreep | undefined
 }
 
 function getInitialContext(self: TCreep) {
-  const { x: selfX, y: selfY } = self.pos
-
-  const droppedEnergy = self.room
-    .find(106)
-    .find((resource) => resource.resourceType === 'energy')
-
   const allCreeps = self.room.find(FIND_MY_CREEPS) as TCreep[]
-
-  const destCreep = allCreeps
-    .filter((creep) =>
-      [ROLE_BUILDER, ROLE_UPGRADER].includes(creep.memory.role)
-    )
-    .find((creep) => creep.store.getCapacity('energy') === 0)
-
-  const energyPos = {
-    x: droppedEnergy?.pos.x ?? selfX,
-    y: droppedEnergy?.pos.y ?? selfY
-  }
-  const destPos = {
-    x: destCreep?.pos.x ?? selfX,
-    y: destCreep?.pos.y ?? selfY
-  }
-
+  const upgraders = getCreepsByRole(
+    allCreeps,
+    // ROLE_BUILDER,
+    ROLE_UPGRADER
+  )
+  // const targetCreep = upgraders.find(
+  //   (creep) => creep.store.getFreeCapacity('energy') === 50
+  // )
+  const targetCreep = upgraders[0]
   return {
     self,
-    droppedEnergy,
-    energyPos,
-    destPos
+    targetCreep
   }
 }
 
 // actions
-function pickupEnergy(ctx: TCtx, _event: EventObject) {
-  const {
-    self,
-    energyPos: { x, y },
-    droppedEnergy
-  } = ctx
-  if (droppedEnergy) {
-    self.moveTo(x, y)
-    self.pickup(droppedEnergy)
-  }
-}
-
-function dropOffEnergy(ctx: TCtx, _event: EventObject) {
-  const {
-    self,
-    destPos: { x, y }
-  } = ctx
+function transferEnergy({ self, targetCreep }: TCtx, _event: TEvent) {
+  const { x, y } = targetCreep!.pos
+  self.say('transferring')
   self.moveTo(x, y)
-  self.drop('energy')
+  self.transfer(targetCreep!, 'energy')
 }
 
 // guards
-function canDeliverEnergy({ self }: TCtx, _: EventObject) {
-  return self.store.getCapacity('energy') > 0
+function canTransferEnergy({ self, targetCreep }: TCtx, _: TEvent) {
+  const canTransfer = targetCreep
+    ? self.store.getFreeCapacity('energy') !== 50
+    : false
+  return canTransfer
 }
 
-function canPickupEnergy({ self }: TCtx, _: EventObject) {
-  return self.store.getCapacity('energy') < 50
+function canReceiveEnergy({ self }: TCtx, _: TEvent) {
+  return self.store.getFreeCapacity('energy') > 0
 }
 
 function auxFactory(creep: TCreep) {
   const auxMachine = createMachine(
     {
       id: 'aux',
-      initial: getInitialState(creep),
+      initial: getInitialState(creep, [STATE_IDLE, STATE_IDLE]),
       context: getInitialContext(creep),
       states: {
         [STATE_IDLE]: {
-          always: [{ target: STATE_SOURCING, cond: GUARD_CAN_PICKUP_ENERGY }]
+          always: [{ target: STATE_READY }]
         },
-        [STATE_SOURCING]: {
+        [STATE_READY]: {
           always: [
             {
-              target: STATE_DELIVERING,
-              cond: GUARD_CAN_DELIVER_ENERGY,
-              actions: [ACTION_PICKUP_ENERGY]
+              target: STATE_TRANSFERRING,
+              cond: GUARD_CAN_TRANSFER_ENERGY,
+              actions: [ACTION_TRANSFER_ENERGY]
             }
           ]
         },
-        [STATE_DELIVERING]: {
+        [STATE_TRANSFERRING]: {
           always: [
             {
-              target: STATE_IDLE,
-              actions: [ACTION_DROP_OFF_ENERGY]
+              target: STATE_READY,
+              cond: GUARD_IS_READY
             }
           ]
         }
@@ -123,12 +89,11 @@ function auxFactory(creep: TCreep) {
     },
     {
       actions: {
-        pickupEnergy,
-        dropOffEnergy
+        transferEnergy
       },
       guards: {
-        canDeliverEnergy,
-        canPickupEnergy
+        canTransferEnergy,
+        canReceiveEnergy
       }
     }
   )
@@ -137,5 +102,10 @@ function auxFactory(creep: TCreep) {
 }
 
 export const aux = {
-  run: (creep: TCreep) => interpret(auxFactory(creep)).start()
+  run: (creep: TCreep) =>
+    interpret(auxFactory(creep))
+      .onTransition((state) => {
+        state.context.self.memory.state = state.value
+      })
+      .start()
 }

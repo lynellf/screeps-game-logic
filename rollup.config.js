@@ -5,6 +5,7 @@ import resolve from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
 import typescript from 'rollup-plugin-typescript2';
 import screeps from 'rollup-plugin-screeps';
+import shim from 'rollup-plugin-shim'
 require('dotenv').config();
 
 const cfg = require("./screeps.json");
@@ -14,7 +15,7 @@ const cfg = require("./screeps.json");
  * */
 function appendToken() {
   const token = process.env.TOKEN;
-  if(cfg) {
+  if (cfg) {
     cfg.token = token;
   }
 }
@@ -35,6 +36,9 @@ export default {
     resolve({ rootDir: "src" }),
     commonjs(),
     typescript({ tsconfig: "./tsconfig.json" }),
+    shim({
+      process: `{ env: { NODE_ENV: 'production' } }`
+    }),
     screeps({ config: cfg })
   ]
 }
