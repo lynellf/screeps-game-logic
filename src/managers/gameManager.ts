@@ -1,20 +1,27 @@
-type TRoomCtx = {
+import type { TAssignment, TCreep } from '@utils/typedefs'
+export type TRoomCtx = {
   id: string;
   energyAvailable: number;
   extensions: number;
   controllerLevel: number;
+  canUpgradeController: boolean;
   spawnRatio: [number, number];
   units: {
     workers: number;
+    total: number;
     combat: {
       physical: number;
       ranged: number;
-      total: number
     };
   };
+  transferTargets: {
+    spawn: number;
+    controller: number;
+  };
+  unitMemory: Array<Record<string, unknown>>;
 };
 
-type TGameCtx = {
+export type TGameCtx = {
   rooms: TRoomCtx[];
 };
 
@@ -25,14 +32,20 @@ const INITIAL_CTX: TGameCtx = {
     extensions: 0,
     controllerLevel: 0,
     spawnRatio: [1, 0],
+    canUpgradeController: false,
     units: {
       workers: 0,
       combat: {
         physical: 0,
-        ranged: 0,
-        total: 0
-      }
-    }
+        ranged: 0
+      },
+      total: 0
+    },
+    transferTargets: {
+      spawn: 0,
+      controller: 0
+    },
+    unitMemory: []
   }]
 }
 
@@ -48,7 +61,9 @@ const SPAWN_RATIOS: Record<number, [number, number]> = {
   7: [1, 0],
   8: [1, 0],
 }
-
+function getByTransferTarget(query: TAssignment) {
+  return (unit: Creep) => (unit as TCreep).memory.transferTarget === query;
+}
 function getByStructureType (structureType: string) {
   return (structure: AnyOwnedStructure) =>
     structure.structureType === structureType;
@@ -73,42 +88,62 @@ function getRawRooms(game: Game) {
 
 function getRoomCtx(room: Room) {
   // structure queries
-  const byExtension = getByStructureType('extension');
-  const byController = getByStructureType('controller');
+  const structByExtension = getByStructureType('extension');
+  const structByController = getByStructureType('controller');
 
   // unit queries
-  const byWorker = getByBodyPart('WORKER');
-  const byPhysical = getByBodyPart('ATTACK');
-  const byRanged = getByBodyPart('RANGED_ATTACK');
+  const unitByWorker = getByBodyPart('work');
+  const unitByPhysical = getByBodyPart('attack');
+  const unitByRanged = getByBodyPart('ranged_attack');
+
+  // transfer target queries
+  const unitBySpawn = getByTransferTarget('spawn');
+  const unitByController = getByTransferTarget('controller');
 
   const id = room.name;
-  const energyAvailable = room.find(105).reduce((sum, resource) => (resource.energy + sum), 0)
-  const extensions = room.find(108).filter(byExtension).length
-  const controller = room.find(108).find(byController) as StructureController
+  const resources = room.find(105);
+  const energyAvailable = resources.reduce((sum, resource) => (resource.energy + sum), 0)
+
+  const structures = room.find(108);
+  const extensions = structures.filter(structByExtension).length
+  const controller = structures.find(structByController) as StructureController
   const controllerLevel = controller.level
-  const units = room.find(FIND_MY_CREEPS)
-  const workers = units.filter(byWorker).length
-  const ranged = units.filter(byRanged).length
-  const physical = units.filter(byPhysical).length
-  const total = ranged + physical
+
+  const units = room.find(102)
+  const workers = units.filter(unitByWorker).length
+  const ranged = units.filter(unitByRanged).length
+  const physical = units.filter(unitByPhysical).length
+  const total = ranged + physical + workers
   const combat = {
     physical,
     ranged,
-    total
   }
   const spawnRatio = SPAWN_RATIOS[controllerLevel] || [1, 0]
+  const unitsAssignedToSpawn = units.filter(unitBySpawn).length
+  const unitsAssignedToController = units.filter(unitByController).length
+  const { progress, progressTotal } = controller
+  const canUpgradeController = progress / progressTotal >= 1
+
   return {
     id,
     energyAvailable,
     extensions,
     controllerLevel,
     spawnRatio,
+    canUpgradeController,
     units: {
       workers,
-      combat
-    }
+      combat,
+      total
+    },
+    transferTargets: {
+      spawn: unitsAssignedToSpawn,
+      controller: unitsAssignedToController
+    },
+    unitMemory: [],
   }
 }
+
 
 export default function GameManager(game: Game, storage: RawMemory) {
   let ctx = getCtx(storage);
@@ -118,4 +153,23 @@ export default function GameManager(game: Game, storage: RawMemory) {
     rooms
   }
   setCtx(storage, ctx);
+
+  const fetchCtx = () => ctx;
+  function unitMemFactory(roomCtx: TRoomCtx) {
+    return (unitName: string) => (record: Record<string, unknown>) => {
+      let memItem = roomCtx.unitMemory.find((item) => item.name === unitName);
+      if (memItem) {
+        memItem = record
+      } else {
+        roomCtx.unitMemory.push({
+          name: unitName,
+          [key]: value,
+        });
+      }
+
+      setCtx(storage, ctx);
+    };
+  }
+  
+  return [fetchCtx, unitMemFactory] as const;
 }

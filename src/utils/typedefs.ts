@@ -11,8 +11,9 @@ export type TRoles =
   | typeof ROLE_HARVESTER
   | typeof ROLE_UPGRADER
 
+export type TAssignment = 'controller' | 'spawn'
 export type TCreep = Creep & {
-  memory: Creep['memory'] & Record<string, unknown> & { role: TRoles }
+  memory: Creep['memory'] & Record<string, unknown> & { role?: TRoles, transferTarget?: TAssignment }
 }
 
 export type TCreeps = Record<string, TCreep>
